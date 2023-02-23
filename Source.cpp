@@ -18,12 +18,18 @@ struct Semen {
 typedef Semen* (*searchFunction)(Semen*, int, int);
 typedef void (*sortingFunction)(Semen*, int);
 
-enum Menu { EXIT, WRITE, READ, SEARCH, SORT, WRITE_TO_FILE };
+enum Menu { EXIT, WRITE, READ, SEARCH, SORT, PRINT, WRITE_TO_FILE };
 enum Months { JAN = 1, FEB, MAR, APR, MAY, JUN, JUL, AUG, SEP, OCT, NOV, DEC };
 
 int getNumberOfSiemens();
 
 void getSiemens(Semen*, int);
+
+Semen* searchHarvesting(Semen*, int, int);
+
+Semen* linearSearch(Semen*, int, int);
+
+Semen* binarySearch(Semen*, int, int);
 
 void sortHarvesting(Semen*, int);
 
@@ -36,6 +42,10 @@ void selectionSort(Semen*, int);
 int writeNamesToBuffer(char*, int, Semen*, int);
 
 void getMenuFunctionNumber(int*);
+
+void getOutputFunctionNumber(int*);
+
+searchFunction getSearchFunction();
 
 sortingFunction getSortingFunction();
 
@@ -61,7 +71,7 @@ int main(int argc, char** argv) {
     Semen* siemens = nullptr;
 
     int bufferLength;
-    char* outputBuffer;
+    char* outputBuffer = nullptr;
 
     int functionNumber = 1;
     while (functionNumber && !cin.fail()) {
@@ -78,20 +88,41 @@ int main(int argc, char** argv) {
             delete[] siemens;
             break;
         case READ:
-        case SEARCH:
-        case SORT:
-        case WRITE_TO_FILE:
             numberOfSiemens = getNumberOfSiemens();
             siemens = readFile<Semen>(path, numberOfSiemens);
             cout << "Культуры из файла:" << endl;
             for (int i = 0; i < numberOfSiemens; i++) cout << "\"" << siemens[i].name << "\"" << endl;
-            if (functionNumber == READ) break;
-            else if (functionNumber == SEARCH) searchHarvesting(siemens, numberOfSiemens, JUN);
-            else if (functionNumber == SORT) sortHarvesting(siemens, numberOfSiemens);
+            delete[] siemens;
+            break;
+        case SEARCH:
+        {
+            numberOfSiemens = getNumberOfSiemens();
+            siemens = readFile<Semen>(path, numberOfSiemens);
+            Semen* foundSiemen = searchHarvesting(siemens, numberOfSiemens, JUN);
+            if (foundSiemen == NULL)
+            {
+                cout << "Not found =(" << endl;
+                return 1;
+            }
+            bufferLength = MAX_SEMEN_NAME_LENGTH + 1;
+            outputBuffer = new char[bufferLength];
+            writeNamesToBuffer(outputBuffer, bufferLength, foundSiemen, 1);
+            getOutputFunctionNumber(&functionNumber);
+            if (functionNumber == PRINT) printMessage(outputBuffer, "Found");
+            else if (functionNumber == WRITE_TO_FILE) writeMessageToFile(outputBuffer, path);
+            delete[] siemens;
+            delete[] outputBuffer;
+            break;
+        }
+        case SORT:
+            numberOfSiemens = getNumberOfSiemens();
+            siemens = readFile<Semen>(path, numberOfSiemens);
+            sortHarvesting(siemens, numberOfSiemens);
             bufferLength = numberOfSiemens * (MAX_SEMEN_NAME_LENGTH + 2) + 1;
             outputBuffer = new char[bufferLength];
             writeNamesToBuffer(outputBuffer, bufferLength, siemens, numberOfSiemens);
-            if (functionNumber == SEARCH || functionNumber == SORT) printMessage(outputBuffer, "Output");
+            getOutputFunctionNumber(&functionNumber);
+            if (functionNumber == PRINT) printMessage(outputBuffer, "Sorted");
             else if (functionNumber == WRITE_TO_FILE) writeMessageToFile(outputBuffer, path);
             delete[] siemens;
             delete[] outputBuffer;
@@ -129,24 +160,25 @@ void getSiemens(Semen* siemens, int numberOfSiemens) {
 
 Semen* searchHarvesting(Semen* siemens, int siemensCount, int month) {
     searchFunction search = getSearchFunction();
-    search(siemens, siemensCount, month);
+    return search(siemens, siemensCount, month);
 }
 
 Semen* linearSearch(Semen* siemens, int siemensCount, int month) {
     for (int i = 0; i < siemensCount; i++) {
         if (siemens[i].monthHarvesting == month) return &siemens[i];
     }
+    return NULL;
 }
 
 Semen* binarySearch(Semen* siemens, int siemensCount, int month) {
     quickSort(siemens, 0, siemensCount - 1);
     int left = 0;
-    int right = siemensCount;
+    int right = siemensCount - 1;
     int mid;
     while (left < right) {
         mid = (left + right) / 2;
-        if (siemens[mid].monthHarvesting < month) right = mid;
-        else if (siemens[mid].monthHarvesting > month) left = mid + 1;
+        if (siemens[mid].monthHarvesting > month) right = mid;
+        else if (siemens[mid].monthHarvesting < month) left = mid + 1;
         else return &siemens[mid];
     }
     return NULL;
@@ -183,8 +215,7 @@ void selectionSort(Semen* siemens, int siemensCount) {
     for (i = 0; i < siemensCount - 1; i++) {
         min_siemen = &siemens[i];
         for (j = i + 1; j < siemensCount; j++) {
-            if (siemens[j].monthHarvesting < min_siemen->monthHarvesting)
-                min_siemen = &siemens[j];
+            if (siemens[j].monthHarvesting < min_siemen->monthHarvesting) min_siemen = &siemens[j];
         }
         swap(*min_siemen, siemens[i]);
     }
@@ -205,6 +236,15 @@ void getMenuFunctionNumber(int* functionNumber) {
     cout << setw(15) << right << "Read: " << READ << endl;
     cout << setw(15) << right << "Search: " << SEARCH << endl;
     cout << setw(15) << right << "Sort: " << SORT << endl;
+    cout << "}\nEnter function number >> ";
+    cin >> *functionNumber;
+    cin.clear();
+    cin.ignore(INT16_MAX, '\n');
+}
+
+void getOutputFunctionNumber(int* functionNumber) {
+    cout << "Output {" << endl;
+    cout << setw(15) << right << "Print: " << PRINT << endl;
     cout << setw(15) << right << "Write to file: " << WRITE_TO_FILE << endl;
     cout << "}\nEnter function number >> ";
     cin >> *functionNumber;
@@ -221,6 +261,12 @@ searchFunction getSearchFunction() {
     cin >> functionNumber;
     cin.clear();
     cin.ignore(INT16_MAX, '\n');
+    switch (functionNumber) {
+    case 2:
+        return linearSearch;
+    default:
+        return binarySearch;
+    }
 }
 
 sortingFunction getSortingFunction() {
@@ -253,10 +299,8 @@ void printMessage(const char* message, const char* windowTitle) {
 void writeMessageToFile(const char* message, const char* path) {
     FILE* filePtr;
     if (fopen_s(&filePtr, path, "w")) return showErrorAndExit("Can't create file ='(");
-
     fputs(message, filePtr);
     if (ferror(filePtr)) return showErrorAndExit("Error while writing file ='(");
-
     fclose(filePtr);
 }
 
@@ -264,10 +308,8 @@ template <typename T>
 void writeFile(const char* path, T* dataForWriting, int amount = 1) {
     FILE* filePtr;
     if (fopen_s(&filePtr, path, "wb") || filePtr == NULL) return showErrorAndExit("Can't create file ='(");
-
     fwrite(dataForWriting, sizeof(T), amount, filePtr);
     if (ferror(filePtr)) return showErrorAndExit("Error while writing file ='(");
-
     fclose(filePtr);
 }
 
@@ -279,11 +321,9 @@ T* readFile(const char* path, int amount = 1) {
         showErrorAndExit("Can't open file for reading ='(");
         return outputPtr;
     }
-
     outputPtr = new T[amount];
     int elemsRead = fread(outputPtr, sizeof(T), amount, filePtr);
     if (ferror(filePtr) || elemsRead < amount) showErrorAndExit("File is broken ='(");
-
     fclose(filePtr);
     return outputPtr;
 }
